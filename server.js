@@ -208,22 +208,72 @@ adsonlearn
 8w2xaFiEiL2FM6rs
 */
 
-/*put (editar)
-app.put("/users/:id", async (req, res) => {
+app.put("/users/promote/:id", checkToken, async (req, res) => {
+  const authHeader = req.headers["authorization"];
+  const token = authHeader && authHeader.split(" ")[1];
+  const secret = process.env.JWT_SECRET;
+  const user = jwt.decode(token, secret);
+
+  const whoRequired = await prisma.user.findUnique({
+    where: {
+      id: user.id
+    },
+  });
+
+  if (whoRequired.permLevel - 1 <= req.body.permLevel) {
+    return res.status(401).json({ message: "Sem permissão suficiente!" });
+  }
+
   await prisma.user.update({
     where: {
       id: req.params.id,
     },
     data: {
-      email: req.body.email,
-      name: req.body.name,
-      password: req.body.password,
+      permLevel: req.body.permLevel + 1,
     },
   });
 
-  res.status(201).json(req.body);
+  res.status(200).json({ message: "Usuário promovido com sucesso!", permLevel: req.body.permLevel + 1 });
 });
-*/
+
+app.put("/users/demote/:id", checkToken, async (req, res) => {
+  const authHeader = req.headers["authorization"];
+  const token = authHeader && authHeader.split(" ")[1];
+  const secret = process.env.JWT_SECRET;
+  const user = jwt.decode(token, secret);
+
+  const whoRequired = await prisma.user.findUnique({
+    where: {
+      id: user.id
+    }
+  });
+
+  if (whoRequired.permLevel <= req.body.permLevel) {
+    return res.status(401).json({ message: "Sem permissão suficiente!" });
+  }
+
+  const requiredUser = await prisma.user.findUnique({
+    where: {
+      id: req.params.id
+    }
+  });
+
+  if (requiredUser.permLevel <= 1) {
+    return res.status(401).json({ message: "Usuário não pode ser rebaixado!" });
+  }
+
+  await prisma.user.update({
+    where: {
+      id: req.params.id,
+    },
+    data: {
+      permLevel: req.body.permLevel - 1,
+    },
+  });
+
+  res.status(200).json({ message: "Usuário rebaixado com sucesso!", permLevel: req.body.permLevel - 1 });
+});
+
 
 app.delete("/users/:id", checkIsAdm, async (req, res) => {
   const authHeader = req.headers["authorization"];
